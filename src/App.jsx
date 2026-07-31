@@ -432,7 +432,7 @@ async function uploadImageToOCR(file) {
     const formData = new FormData();
     formData.append("image", file);
 
-    const response = await fetch("http://localhost:3001/ocr/test", {
+    const response = await fetch("https://central-tags-server.onrender.com/ocr/test", {
       method: "POST",
       body: formData,
     });

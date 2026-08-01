@@ -1251,7 +1251,7 @@ boxSizing: "border-box",
       {isOcrProcessing && (
   <div
     style={{
-  position: "absolute",
+  position: "fixed",
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
@@ -1262,7 +1262,7 @@ boxSizing: "border-box",
   borderRadius: "14px",
   padding: "22px",
   textAlign: "center",
-  zIndex: 30,
+  zIndex: 6000,
   boxShadow: "0 0 25px rgba(0,0,0,0.8)",
 }}
   >

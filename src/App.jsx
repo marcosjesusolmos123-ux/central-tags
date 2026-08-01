@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  reload,
   sendEmailVerification,
   sendPasswordResetEmail,
 } from "firebase/auth";
@@ -16,6 +17,8 @@ import {
 import DoubleTableView from "./components/DoubleTableView";
 function App() {
   const appContainerRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const focusPasswordAfterLogoutRef = useRef(false);
   const heroNick = "HERO";
 const EMPTY_SEAT_LABEL = "Asiento vacío";
 const OLD_EMPTY_SEAT_LABEL = "Jugador vacío";
@@ -37,12 +40,14 @@ const [editingNoteIndex, setEditingNoteIndex] = useState(null);
 const [editedNoteText, setEditedNoteText] = useState("");
 const [clipboardText, setClipboardText] = useState("");
 const [user, setUser] = useState(null);
-const [email, setEmail] = useState("");
+const [email, setEmail] = useState(() => localStorage.getItem("centralTagsLastEmail") || "");
 const [password, setPassword] = useState("");
+const [showPassword, setShowPassword] = useState(false);
 const [confirmPassword, setConfirmPassword] = useState("");
 const [isRegisterMode, setIsRegisterMode] = useState(false);
 const [showVerificationScreen, setShowVerificationScreen] = useState(false);
 const [verificationEmail, setVerificationEmail] = useState("");
+const [unverifiedLoginUser, setUnverifiedLoginUser] = useState(null);
 const [displayName, setDisplayName] = useState("");
 const [heroName, setHeroName] = useState("HERO");
 const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -157,10 +162,12 @@ const searchResults =
       );
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    setUser(currentUser);
+    const verifiedUser = currentUser?.emailVerified ? currentUser : null;
+
+    setUser(verifiedUser);
     setLoadedUserId(null);
-    if (currentUser) {
-  loadTablesFromCloud(currentUser);
+    if (verifiedUser) {
+  loadTablesFromCloud(verifiedUser);
 } else {
   setImportedPlayers([]);
 }
@@ -168,6 +175,12 @@ useEffect(() => {
 
   return () => unsubscribe();
 }, []);
+useEffect(() => {
+  if (!user && focusPasswordAfterLogoutRef.current) {
+    focusPasswordAfterLogoutRef.current = false;
+    passwordInputRef.current?.focus();
+  }
+}, [user]);
       useEffect(() => {
         if (!user || loadedUserId !== user.uid) {
   return;
@@ -296,15 +309,49 @@ async function loginUser() {
 );
 
 if (!userCredential.user.emailVerified) {
-  await signOut(auth);
-
-  showToast("📧 Debes verificar tu correo antes de iniciar sesión.");
+  setUnverifiedLoginUser(userCredential.user);
 
   return;
 }
+
+localStorage.setItem("centralTagsLastEmail", userCredential.user.email);
+}
+
+async function resendLoginVerificationEmail() {
+  if (!unverifiedLoginUser) return;
+
+  try {
+    await sendEmailVerification(unverifiedLoginUser);
+    showToast("📧 Correo de verificación enviado.");
+  } catch {
+    showToast("⚠️ No se pudo enviar el correo de verificación.");
+  }
+}
+
+async function confirmLoginEmailVerification() {
+  if (!unverifiedLoginUser) return;
+
+  try {
+    await reload(unverifiedLoginUser);
+
+    if (!unverifiedLoginUser.emailVerified) {
+      showToast("⚠️ Tu correo todavía no fue verificado.");
+      return;
+    }
+
+    localStorage.setItem("centralTagsLastEmail", unverifiedLoginUser.email);
+    setUnverifiedLoginUser(null);
+    setUser(unverifiedLoginUser);
+    await loadTablesFromCloud(unverifiedLoginUser);
+  } catch {
+    showToast("⚠️ No se pudo comprobar la verificación del correo.");
+  }
 }
 
 async function logoutUser() {
+  setPassword("");
+  setShowPassword(false);
+  focusPasswordAfterLogoutRef.current = true;
   setLoadedUserId(null);
   await signOut(auth);
 }  
@@ -804,6 +851,71 @@ margin: "0 auto",
         textAlign: "center",
       }}
     >
+      {unverifiedLoginUser && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 6000,
+          }}
+        >
+          <div
+            style={{
+              width: "calc(100% - 32px)",
+              maxWidth: "420px",
+              background: "#1b1b1b",
+              border: "1px solid #555",
+              borderRadius: "18px",
+              padding: "32px",
+              textAlign: "center",
+              color: "white",
+              boxShadow: "0 0 30px rgba(0,0,0,0.8)",
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: "24px", color: "#FFFFFF" }}>
+              ⚠️ Tu correo todavía no fue verificado.
+            </h2>
+
+            <button
+              onClick={resendLoginVerificationEmail}
+              style={{
+                width: "100%",
+                padding: "14px",
+                marginBottom: "12px",
+                background: "#1e90ff",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "bold",
+                fontSize: "16px",
+              }}
+            >
+              Reenviar correo de verificación
+            </button>
+
+            <button
+              onClick={confirmLoginEmailVerification}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: "#292929",
+                color: "white",
+                border: "1px solid #555",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontSize: "15px",
+              }}
+            >
+              Ya verifiqué mi correo
+            </button>
+          </div>
+        </div>
+      )}
       {showVerificationScreen && (
   <div
     style={{
@@ -938,7 +1050,7 @@ maxWidth: "420px",
       border: "1px solid #555",
       borderRadius: "10px",
       padding: "12px 18px",
-      zIndex: 5000,
+      zIndex: 7000,
       boxShadow: "0 0 12px rgba(0,0,0,0.5)",
     }}
   >
@@ -973,6 +1085,7 @@ maxWidth: "420px",
       <input
       
         placeholder="Email"
+        autoComplete="username"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         style={{
@@ -986,21 +1099,49 @@ maxWidth: "420px",
         }}
       />
 
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "14px",
-          marginBottom: "18px",
-          borderRadius: "10px",
-          border: "1px solid #555",
-          boxSizing: "border-box",
-          fontSize: "16px",
-        }}
-      />
+      <div style={{ position: "relative" }}>
+        <input
+          ref={passwordInputRef}
+          type={!isRegisterMode && showPassword ? "text" : "password"}
+          placeholder="Contraseña"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "14px",
+            paddingRight: !isRegisterMode ? "48px" : "14px",
+            marginBottom: "18px",
+            borderRadius: "10px",
+            border: "1px solid #555",
+            boxSizing: "border-box",
+            fontSize: "16px",
+          }}
+        />
+        {!isRegisterMode && (
+          <button
+            type="button"
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowPassword((current) => !current)}
+            style={{
+              position: "absolute",
+              top: "23px",
+              right: "14px",
+              transform: "translateY(-50%)",
+              padding: 0,
+              background: "transparent",
+              border: "none",
+              color: "white",
+              cursor: "pointer",
+              fontSize: "20px",
+              lineHeight: 1,
+            }}
+          >
+            {showPassword ? "👁️" : "👁️‍🗨️"}
+          </button>
+        )}
+      </div>
 {isRegisterMode && (
   <input
     type="password"

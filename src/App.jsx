@@ -39,7 +39,7 @@ const [editingNoteIndex, setEditingNoteIndex] = useState(null);
 const [editedNoteText, setEditedNoteText] = useState("");
 const [clipboardText, setClipboardText] = useState("");
 const [user, setUser] = useState(null);
-const [email, setEmail] = useState(() => localStorage.getItem("centralTagsLastEmail") || "");
+const [email, setEmail] = useState("");
 const [password, setPassword] = useState("");
 const [showPassword, setShowPassword] = useState(false);
 const [confirmPassword, setConfirmPassword] = useState("");
@@ -307,7 +307,6 @@ if (!userCredential.user.emailVerified) {
   return;
 }
 
-localStorage.setItem("centralTagsLastEmail", userCredential.user.email);
 }
 
 async function resendLoginVerificationEmail() {
@@ -332,7 +331,6 @@ async function confirmLoginEmailVerification() {
       return;
     }
 
-    localStorage.setItem("centralTagsLastEmail", unverifiedLoginUser.email);
     setUnverifiedLoginUser(null);
     setUser(unverifiedLoginUser);
     await loadTablesFromCloud(unverifiedLoginUser);
@@ -342,6 +340,7 @@ async function confirmLoginEmailVerification() {
 }
 
 async function logoutUser() {
+  setEmail("");
   setPassword("");
   setShowPassword(false);
   setLoadedUserId(null);

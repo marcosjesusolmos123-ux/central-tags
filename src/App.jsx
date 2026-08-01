@@ -18,7 +18,6 @@ import DoubleTableView from "./components/DoubleTableView";
 function App() {
   const appContainerRef = useRef(null);
   const passwordInputRef = useRef(null);
-  const focusPasswordAfterLogoutRef = useRef(false);
   const heroNick = "HERO";
 const EMPTY_SEAT_LABEL = "Asiento vacío";
 const OLD_EMPTY_SEAT_LABEL = "Jugador vacío";
@@ -175,12 +174,6 @@ useEffect(() => {
 
   return () => unsubscribe();
 }, []);
-useEffect(() => {
-  if (!user && focusPasswordAfterLogoutRef.current) {
-    focusPasswordAfterLogoutRef.current = false;
-    passwordInputRef.current?.focus();
-  }
-}, [user]);
       useEffect(() => {
         if (!user || loadedUserId !== user.uid) {
   return;
@@ -351,7 +344,6 @@ async function confirmLoginEmailVerification() {
 async function logoutUser() {
   setPassword("");
   setShowPassword(false);
-  focusPasswordAfterLogoutRef.current = true;
   setLoadedUserId(null);
   await signOut(auth);
 }  

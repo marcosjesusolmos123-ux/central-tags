@@ -15,6 +15,7 @@ export default function DoubleTableView({
   setSearchText,
   searchResults,
   addSearchPlayerToSeat,
+  removePlayerFromSeat,
   sitPlayerInSelectedSeat,
   clearCurrentTable,
 }) {
@@ -269,6 +270,18 @@ boxShadow:
     }}
   >
     Agregar
+  </button>
+
+  <button
+    onClick={removePlayerFromSeat}
+    disabled={!selectedSeat}
+    style={{
+      padding: "8px 14px",
+      borderRadius: "6px",
+      cursor: "pointer",
+    }}
+  >
+    Quitar del asiento
   </button>
 
   {searchResults.length > 0 && (

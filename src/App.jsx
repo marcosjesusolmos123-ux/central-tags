@@ -1323,6 +1323,7 @@ boxSizing: "border-box",
   setSearchText={setSearchText}
   searchResults={searchResults}
   addSearchPlayerToSeat={addSearchPlayerToSeat}
+  removePlayerFromSeat={removePlayerFromSeat}
   sitPlayerInSelectedSeat={sitPlayerInSelectedSeat}
   clearCurrentTable={clearCurrentTable}
 />

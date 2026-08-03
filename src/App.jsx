@@ -465,13 +465,22 @@ if (playerAlreadyExists) {
   sitPlayerInSelectedSeat(text);
 }
 async function uploadImageToOCR(file) {
+  if (!auth.currentUser) {
+    showToast("⚠️ Tenés que iniciar sesión para usar el OCR.");
+    return;
+  }
+
   try {
     setIsOcrProcessing(true);
+    const idToken = await auth.currentUser.getIdToken();
     const formData = new FormData();
     formData.append("image", file);
 
     const response = await fetch("https://central-tags-server.onrender.com/ocr/test", {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
       body: formData,
     });
 

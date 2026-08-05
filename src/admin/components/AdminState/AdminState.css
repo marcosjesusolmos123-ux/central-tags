@@ -1,0 +1,4 @@
+.admin-state { display: grid; justify-items: center; gap: 10px; padding: 48px 24px; border: 1px dashed var(--admin-border); border-radius: 16px; background: var(--admin-panel); text-align: center; }
+.admin-state--full { min-height: 100vh; place-content: center; border: 0; border-radius: 0; background: #0b0d12; color: #f5f7fb; }
+.admin-state h2, .admin-state p { margin: 0; }.admin-state h2 { font-size: 18px; color: inherit; }.admin-state p { max-width: 560px; color: var(--admin-muted, #98a2b3); font-size: 14px; }
+.admin-state__spinner { width: 28px; height: 28px; border: 3px solid #293142; border-top-color: #6c8cff; border-radius: 50%; animation: admin-spin .8s linear infinite; }@keyframes admin-spin { to { transform: rotate(360deg); } }

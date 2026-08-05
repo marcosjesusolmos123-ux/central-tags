@@ -1,49 +1,27 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase.js";
-import AdminDashboard from "./AdminDashboard.jsx";
-import "./admin.css";
-
-const serverUrl =
-  import.meta.env.VITE_CENTRAL_TAGS_SERVER_URL ||
-  "https://central-tags-server.onrender.com";
+import AdminApp from "./AdminApp.jsx";
+import { adminApi } from "./services/adminApi.js";
+import { AdminState } from "./components/AdminState/AdminState.jsx";
 
 function AdminRoute() {
   const [accessState, setAccessState] = useState("checking");
 
   useEffect(() => {
     const controller = new AbortController();
-
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         setAccessState("denied");
         return;
       }
-
       try {
-        const idToken = await currentUser.getIdToken();
-        const response = await fetch(`${serverUrl}/admin/session`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-          },
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          setAccessState("denied");
-          return;
-        }
-
-        const data = await response.json();
+        const data = await adminApi.getSession({ signal: controller.signal });
         setAccessState(data.authorized === true ? "authorized" : "denied");
       } catch (error) {
-        if (error.name !== "AbortError") {
-          setAccessState("denied");
-        }
+        if (error.name !== "AbortError") setAccessState("denied");
       }
     });
-
     return () => {
       controller.abort();
       unsubscribe();
@@ -51,14 +29,12 @@ function AdminRoute() {
   }, []);
 
   if (accessState === "checking") {
-    return <main className="admin-status">Cargando...</main>;
+    return <AdminState fullPage type="loading" title="Validando acceso" />;
   }
-
   if (accessState !== "authorized") {
-    return <main className="admin-status">Página no disponible.</main>;
+    return <AdminState fullPage type="error" title="Página no disponible" message="La sesión no tiene permisos administrativos o no pudo validarse." />;
   }
-
-  return <AdminDashboard />;
+  return <AdminApp />;
 }
 
 export default AdminRoute;

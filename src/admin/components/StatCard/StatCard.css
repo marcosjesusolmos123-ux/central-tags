@@ -1,0 +1,1 @@
+.admin-stat-card { display: grid; gap: 8px; min-width: 0; padding: 20px; border: 1px solid var(--admin-border); border-radius: 14px; background: var(--admin-panel); text-align: left; }.admin-stat-card span, .admin-stat-card small { color: var(--admin-muted); font-size: 13px; }.admin-stat-card strong { color: var(--admin-text); font-size: 28px; line-height: 1; }

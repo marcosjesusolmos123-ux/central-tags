@@ -18,6 +18,7 @@ import DoubleTableView from "./components/DoubleTableView";
 function App() {
   const appContainerRef = useRef(null);
   const passwordInputRef = useRef(null);
+  const lastOcrRemainingNoticeRef = useRef(null);
   const heroNick = "HERO";
 const EMPTY_SEAT_LABEL = "Asiento vacío";
 const OLD_EMPTY_SEAT_LABEL = "Jugador vacío";
@@ -486,6 +487,13 @@ async function uploadImageToOCR(file) {
 
     const data = await response.json();
 
+    if (data.code === "OCR_LIMIT_REACHED") {
+      showToast(
+        "No te quedan capturas OCR. Podés seguir utilizando Central Tags normalmente. Para renovar el OCR comunicate con el administrador."
+      );
+      return;
+    }
+
     if (!data.ok) {
       showToast("⚠️ Error OCR: " + data.message);
       return;
@@ -497,6 +505,29 @@ async function uploadImageToOCR(file) {
     }
 
     pastePlayerToSeat(data.text.trim());
+
+    const remainingNotices = {
+      50: "Te quedan 50 capturas OCR.",
+      30: "Te quedan 30 capturas OCR.",
+      20: "Te quedan 20 capturas OCR.",
+      10: "⚠️ Solo te quedan 10 capturas OCR.",
+      5: "⚠️ Solo te quedan 5 capturas OCR.",
+      4: "⚠️ Solo te quedan 4 capturas OCR.",
+      3: "⚠️ Solo te quedan 3 capturas OCR.",
+      2: "⚠️ Solo te quedan 2 capturas OCR.",
+      1: "🚨 Última captura OCR disponible.",
+    };
+    const remainingNotice = remainingNotices[data.ocrRemaining];
+
+    if (
+      remainingNotice &&
+      lastOcrRemainingNoticeRef.current !== data.ocrRemaining
+    ) {
+      lastOcrRemainingNoticeRef.current = data.ocrRemaining;
+      showToast(remainingNotice);
+    } else if (!remainingNotice) {
+      lastOcrRemainingNoticeRef.current = null;
+    }
     } catch (error) {
     console.error(error);
     showToast("⚠️ No se pudo conectar con el servidor OCR.");

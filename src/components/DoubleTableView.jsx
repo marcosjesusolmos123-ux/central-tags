@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function DoubleTableView({
   onBack,
@@ -20,6 +20,26 @@ export default function DoubleTableView({
   clearCurrentTable,
 }) {
   const [visibleGroup, setVisibleGroup] = useState("1-2");
+
+  useEffect(() => {
+    const documentRoot = document.documentElement;
+    const previousOverflowY = documentRoot.style.getPropertyValue("overflow-y");
+    const previousPriority = documentRoot.style.getPropertyPriority("overflow-y");
+
+    documentRoot.style.setProperty("overflow-y", "hidden");
+
+    return () => {
+      if (previousOverflowY) {
+        documentRoot.style.setProperty(
+          "overflow-y",
+          previousOverflowY,
+          previousPriority,
+        );
+      } else {
+        documentRoot.style.removeProperty("overflow-y");
+      }
+    };
+  }, []);
 
   const visibleTableNumbers =
     visibleGroup === "1-2" ? [1, 2] : [3, 4];

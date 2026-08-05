@@ -15,10 +15,62 @@ import {
   getDoc,
 } from "firebase/firestore";
 import DoubleTableView from "./components/DoubleTableView";
+
+const OCR_REMAINING_NOTICES = {
+  50: "Te quedan 50 capturas OCR.",
+  30: "Te quedan 30 capturas OCR.",
+  20: "Te quedan 20 capturas OCR.",
+  10: "⚠️ Solo te quedan 10 capturas OCR.",
+  5: "⚠️ Solo te quedan 5 capturas OCR.",
+  4: "⚠️ Solo te quedan 4 capturas OCR.",
+  3: "⚠️ Solo te quedan 3 capturas OCR.",
+  2: "⚠️ Solo te quedan 2 capturas OCR.",
+  1: "🚨 Última captura OCR disponible.",
+};
+
+function ToastStack({ toasts, placement = "center" }) {
+  if (!toasts.length) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: placement === "top" ? "40px" : "50%",
+        left: "50%",
+        transform:
+          placement === "top" ? "translateX(-50%)" : "translate(-50%, -50%)",
+        zIndex: 7000,
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        width: "min(520px, calc(100% - 32px))",
+        pointerEvents: "none",
+      }}
+    >
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          style={{
+            background: "#1b1b1b",
+            color: "white",
+            border: "1px solid #555",
+            borderRadius: "10px",
+            padding: "12px 16px",
+            boxShadow: "0 0 12px rgba(0,0,0,0.5)",
+            textAlign: "center",
+          }}
+        >
+          {toast.message}
+        </div>
+      ))}
+    </div>
+  );
+}
 function App() {
   const appContainerRef = useRef(null);
   const passwordInputRef = useRef(null);
   const lastOcrRemainingNoticeRef = useRef(null);
+  const nextToastIdRef = useRef(0);
   const heroNick = "HERO";
 const EMPTY_SEAT_LABEL = "Asiento vacío";
 const OLD_EMPTY_SEAT_LABEL = "Jugador vacío";
@@ -56,13 +108,37 @@ const [confirmModal, setConfirmModal] = useState(null);
 const [databaseSearchText, setDatabaseSearchText] = useState("");
 const [selectedDatabasePlayer, setSelectedDatabasePlayer] = useState(null);
 const [importedPlayers, setImportedPlayers] = useState([]);
-const [toast, setToast] = useState("");
+const [toasts, setToasts] = useState([]);
 function showToast(message) {
-  setToast(message);
+  const toastId = ++nextToastIdRef.current;
+
+  setToasts((currentToasts) => {
+    if (currentToasts.some((toast) => toast.message === message)) {
+      return currentToasts;
+    }
+
+    return [...currentToasts, { id: toastId, message }];
+  });
 
   setTimeout(() => {
-    setToast("");
+    setToasts((currentToasts) =>
+      currentToasts.filter((toast) => toast.id !== toastId)
+    );
   }, 2500);
+}
+
+function showOcrRemainingNotice(ocrRemaining) {
+  const remainingNotice = OCR_REMAINING_NOTICES[ocrRemaining];
+
+  if (
+    remainingNotice &&
+    lastOcrRemainingNoticeRef.current !== ocrRemaining
+  ) {
+    lastOcrRemainingNoticeRef.current = ocrRemaining;
+    showToast(remainingNotice);
+  } else if (!remainingNotice) {
+    lastOcrRemainingNoticeRef.current = null;
+  }
 }
 const [tempDisplayName, setTempDisplayName] = useState("");
 const [tempHeroName, setTempHeroName] = useState("");
@@ -205,6 +281,7 @@ useEffect(() => {
   }
 
   if (!selectedSeat) {
+    showToast("Primero seleccioná un asiento.");
     return;
   }
 
@@ -445,7 +522,7 @@ if (selectedSeatData && !isEmptySeatNick(selectedSeatData.nick)) {
 );
 
 if (playerAlreadyExists) {
-  showToast("⚠️ Este jugador ya está sentado en la mesa.");
+  showToast("Este jugador ya está sentado en la mesa. El OCR ya fue procesado y consumió una captura.");
   return;
 }
 
@@ -466,6 +543,27 @@ if (playerAlreadyExists) {
   sitPlayerInSelectedSeat(text);
 }
 async function uploadImageToOCR(file) {
+  if (!selectedSeat) {
+    showToast("Primero seleccioná un asiento.");
+    return;
+  }
+
+  if (selectedSeat === 5) {
+    showToast("⚠️ No podés reemplazar tu asiento.");
+    return;
+  }
+
+  const selectedSeatData = currentSeats.find(
+    (seat) => seat.id === selectedSeat
+  );
+
+  if (selectedSeatData && !isEmptySeatNick(selectedSeatData.nick)) {
+    showToast(
+      "El asiento ya está ocupado. Primero quitá al jugador del asiento."
+    );
+    return;
+  }
+
   if (!auth.currentUser) {
     showToast("⚠️ Tenés que iniciar sesión para usar el OCR.");
     return;
@@ -501,33 +599,12 @@ async function uploadImageToOCR(file) {
 
     if (!data.text.trim()) {
       showToast("⚠️ No se detectó texto.");
+      showOcrRemainingNotice(data.ocrRemaining);
       return;
     }
 
     pastePlayerToSeat(data.text.trim());
-
-    const remainingNotices = {
-      50: "Te quedan 50 capturas OCR.",
-      30: "Te quedan 30 capturas OCR.",
-      20: "Te quedan 20 capturas OCR.",
-      10: "⚠️ Solo te quedan 10 capturas OCR.",
-      5: "⚠️ Solo te quedan 5 capturas OCR.",
-      4: "⚠️ Solo te quedan 4 capturas OCR.",
-      3: "⚠️ Solo te quedan 3 capturas OCR.",
-      2: "⚠️ Solo te quedan 2 capturas OCR.",
-      1: "🚨 Última captura OCR disponible.",
-    };
-    const remainingNotice = remainingNotices[data.ocrRemaining];
-
-    if (
-      remainingNotice &&
-      lastOcrRemainingNoticeRef.current !== data.ocrRemaining
-    ) {
-      lastOcrRemainingNoticeRef.current = data.ocrRemaining;
-      showToast(remainingNotice);
-    } else if (!remainingNotice) {
-      lastOcrRemainingNoticeRef.current = null;
-    }
+    showOcrRemainingNotice(data.ocrRemaining);
     } catch (error) {
     console.error(error);
     showToast("⚠️ No se pudo conectar con el servidor OCR.");
@@ -1069,25 +1146,7 @@ maxWidth: "420px",
     </div>
   </div>
 )}
-    {toast && (
-  <div
-    style={{
-      position: "fixed",
-      top: "40px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      background: "#1b1b1b",
-      color: "white",
-      border: "1px solid #555",
-      borderRadius: "10px",
-      padding: "12px 18px",
-      zIndex: 7000,
-      boxShadow: "0 0 12px rgba(0,0,0,0.5)",
-    }}
-  >
-    {toast}
-  </div>
-)}
+    <ToastStack toasts={toasts} placement="top" />
       <h1
   style={{
     marginTop: 0,
@@ -1368,25 +1427,7 @@ boxSizing: "border-box",
   clearCurrentTable={clearCurrentTable}
 />
 )}
-      {toast && (
-  <div
-    style={{
-      position: "fixed",
-top: "50%",
-left: "50%",
-transform: "translate(-50%, -50%)",
-      background: "#1b1b1b",
-      color: "white",
-      border: "1px solid #555",
-      borderRadius: "10px",
-      padding: "12px 16px",
-      zIndex: 7000,
-      boxShadow: "0 0 12px rgba(0,0,0,0.5)",
-    }}
-  >
-    {toast}
-  </div>
-)}
+      <ToastStack toasts={toasts} />
       <div style={{ textAlign: "center", marginBottom: "10px" }}>
   <button
   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}

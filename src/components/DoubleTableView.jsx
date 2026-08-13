@@ -18,6 +18,7 @@ export default function DoubleTableView({
   removePlayerFromSeat,
   sitPlayerInSelectedSeat,
   clearCurrentTable,
+  showToast,
 }) {
   const [visibleGroup, setVisibleGroup] = useState("1-2");
 
@@ -43,6 +44,22 @@ export default function DoubleTableView({
 
   const visibleTableNumbers =
     visibleGroup === "1-2" ? [1, 2] : [3, 4];
+
+  function handleEmptyAreaShiftClick(event) {
+    if (!event.shiftKey || event.button !== 0) return;
+
+    const isTableFeltCenter = event.target.closest("[data-table-felt-center]");
+    const interactiveTarget = event.target.closest(
+      'button, input, textarea, select, a, [role="button"], [contenteditable="true"], [data-no-table-shortcut], .double-mini-table, .double-table-grid'
+    );
+
+    if (!isTableFeltCenter && interactiveTarget) return;
+
+    const nextVisibleGroup = visibleGroup === "1-2" ? "3-4" : "1-2";
+
+    setVisibleGroup(nextVisibleGroup);
+    showToast(`Mostrando Mesas ${nextVisibleGroup}`, 1000);
+  }
 
   function MiniTable({ tableNumber }) {
     const seats = tables?.[tableNumber] || [];
@@ -108,6 +125,7 @@ export default function DoubleTableView({
   }}
 >
           <div
+            data-table-felt-center
             style={{
               position: "absolute",
               width: "68%",
@@ -238,7 +256,7 @@ boxShadow:
 
   return (
     <div
-    
+      onClick={handleEmptyAreaShiftClick}
       style={{
         position: "fixed",
         inset: 0,
@@ -255,6 +273,7 @@ boxShadow:
       }}
     >
       <div
+  data-no-table-shortcut
   style={{
     display: "flex",
     justifyContent: "center",
@@ -337,6 +356,7 @@ boxShadow:
   )}
 </div>
       <div
+        data-no-table-shortcut
         style={{
           display: "flex",
           justifyContent: "flex-start",

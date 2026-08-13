@@ -109,7 +109,7 @@ const [databaseSearchText, setDatabaseSearchText] = useState("");
 const [selectedDatabasePlayer, setSelectedDatabasePlayer] = useState(null);
 const [importedPlayers, setImportedPlayers] = useState([]);
 const [toasts, setToasts] = useState([]);
-function showToast(message) {
+function showToast(message, duration = 2500) {
   const toastId = ++nextToastIdRef.current;
 
   setToasts((currentToasts) => {
@@ -124,7 +124,7 @@ function showToast(message) {
     setToasts((currentToasts) =>
       currentToasts.filter((toast) => toast.id !== toastId)
     );
-  }, 2500);
+  }, duration);
 }
 
 function showOcrRemainingNotice(ocrRemaining) {
@@ -480,6 +480,42 @@ function updateCurrentTable(newSeats) {
       [activeTable]: newSeats,
     }));
   }
+
+function confirmDeleteDatabasePlayer(player) {
+  setConfirmModal({
+    title: "Eliminar jugador",
+    message: `¿Seguro que querés eliminar a ${player.nick} de la base de datos?\n\nEste jugador se eliminará de forma permanente y desaparecerá de todas las mesas abiertas.`,
+    onConfirm: () => {
+      setTables((currentTables) => {
+        const updatedTables = {};
+
+        Object.keys(currentTables).forEach((tableNumber) => {
+          updatedTables[tableNumber] = currentTables[tableNumber].map((seat) =>
+            !seat.hero && seat.nick === player.nick
+              ? { ...seat, nick: EMPTY_SEAT_LABEL, color: "#666", notes: [] }
+              : seat
+          );
+        });
+
+        return updatedTables;
+      });
+
+      setImportedPlayers((currentPlayers) =>
+        currentPlayers.filter((savedPlayer) => savedPlayer.nick !== player.nick)
+      );
+      setSelectedDatabasePlayer((selectedPlayer) =>
+        selectedPlayer?.nick === player.nick ? null : selectedPlayer
+      );
+      setOpenedPlayer((currentPlayer) =>
+        currentPlayer?.nick === player.nick ? null : currentPlayer
+      );
+      setSelectedSeat(null);
+      setHoveredSeat(null);
+      setConfirmModal(null);
+      showToast("Jugador eliminado de la base de datos.");
+    },
+  });
+}
 
   function changeTable(tableNumber) {
     setActiveTable(tableNumber);
@@ -1425,6 +1461,7 @@ boxSizing: "border-box",
   removePlayerFromSeat={removePlayerFromSeat}
   sitPlayerInSelectedSeat={sitPlayerInSelectedSeat}
   clearCurrentTable={clearCurrentTable}
+  showToast={showToast}
 />
 )}
       <ToastStack toasts={toasts} />
@@ -2005,8 +2042,34 @@ return;
       color: "white",
     }}
   >
-    <div style={{ fontWeight: "bold", marginBottom: "6px" }}>
-      {player.nick}
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "10px",
+        marginBottom: "6px",
+      }}
+    >
+      <div style={{ fontWeight: "bold" }}>{player.nick}</div>
+
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          confirmDeleteDatabasePlayer(player);
+        }}
+        style={{
+          background: "#b22222",
+          color: "white",
+          border: "none",
+          borderRadius: "6px",
+          padding: "6px 10px",
+          cursor: "pointer",
+          fontWeight: "bold",
+        }}
+      >
+        Eliminar
+      </button>
     </div>
 
     <div

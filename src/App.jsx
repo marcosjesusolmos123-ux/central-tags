@@ -28,6 +28,21 @@ const OCR_REMAINING_NOTICES = {
   1: "🚨 Última captura OCR disponible.",
 };
 
+const DEFAULT_COLOR_NAMES = {
+  "#d62828": "Rojo",
+  "#52b788": "Verde",
+  "#277da1": "Azul",
+  "#7b2cbf": "Violeta",
+  "#f4a261": "Naranja",
+  "#264653": "Azul petróleo",
+  "#ffd60a": "Amarillo",
+  "#8d5524": "Marrón",
+  "#ffffff": "Blanco",
+  "#ff66c4": "Rosa",
+  "#00f5d4": "Turquesa",
+  "#9ef01a": "Verde lima",
+};
+
 function ToastStack({ toasts, placement = "center" }) {
   if (!toasts.length) return null;
 
@@ -108,6 +123,9 @@ const [confirmModal, setConfirmModal] = useState(null);
 const [databaseSearchText, setDatabaseSearchText] = useState("");
 const [selectedDatabasePlayer, setSelectedDatabasePlayer] = useState(null);
 const [importedPlayers, setImportedPlayers] = useState([]);
+const [colorNames, setColorNames] = useState(DEFAULT_COLOR_NAMES);
+const [editedColorNames, setEditedColorNames] = useState(DEFAULT_COLOR_NAMES);
+const [isEditingColorNames, setIsEditingColorNames] = useState(false);
 const [toasts, setToasts] = useState([]);
 function showToast(message, duration = 2500) {
   const toastId = ++nextToastIdRef.current;
@@ -246,6 +264,7 @@ useEffect(() => {
   loadTablesFromCloud(verifiedUser);
 } else {
   setImportedPlayers([]);
+  setColorNames(DEFAULT_COLOR_NAMES);
 }
   });
 
@@ -459,6 +478,7 @@ async function loadTablesFromCloud(targetUser = user) {
     const data = docSnap.data();
     setDisplayName(data.displayName || "");
     setHeroName(data.heroName || "HERO");
+    setColorNames({ ...DEFAULT_COLOR_NAMES, ...(data.colorNames || {}) });
     setTables(data.tables || emptyTables);
 
     setImportedPlayers(
@@ -468,6 +488,7 @@ async function loadTablesFromCloud(targetUser = user) {
   } else {
     setDisplayName("");
     setHeroName("HERO");
+    setColorNames(DEFAULT_COLOR_NAMES);
     setTables(emptyTables);
     setImportedPlayers([]);
   }
@@ -793,6 +814,31 @@ function changePlayerColor(color) {
   );
 
   setOpenedPlayer((current) => ({ ...current, color }));
+}
+
+async function saveColorNames() {
+  const normalizedColorNames = Object.fromEntries(
+    tagColors.map((color) => [
+      color,
+      editedColorNames[color]?.trim() || DEFAULT_COLOR_NAMES[color],
+    ])
+  );
+
+  try {
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
+        colorNames: normalizedColorNames,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    setColorNames(normalizedColorNames);
+    setIsEditingColorNames(false);
+    showToast("✅ Nombres de colores guardados.");
+  } catch {
+    showToast("⚠️ No se pudieron guardar los nombres de colores.");
+  }
 }
 function saveEditedNick() {
   if (!editedNick.trim()) return;
@@ -1453,6 +1499,7 @@ boxSizing: "border-box",
     setSelectedSeat(seatId);
   }}
   onOpenPlayer={openPlayerCard}
+  colorNames={colorNames}
 
     searchText={searchText}
   setSearchText={setSearchText}
@@ -2245,8 +2292,21 @@ onClick={() => {
               boxShadow: "0 0 25px rgba(0,0,0,0.8)",
             }}
           >
-            <h2 style={{ marginTop: 0, color: "white" }}>{hoveredSeat.nick}</h2>
-            
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "10px",
+              }}
+            >
+              <h2 style={{ margin: 0, color: "white", textAlign: "left" }}>
+                {hoveredSeat.nick}
+              </h2>
+              <div style={{ color: "#bbb", textAlign: "right" }}>
+                {colorNames[hoveredSeat.color] || "Sin asignar"}
+              </div>
+            </div>
 
             {hoveredSeat.notes.length > 0 ? (
               hoveredSeat.notes.map((note, index) => (
@@ -2283,7 +2343,9 @@ onClick={() => {
               width: "165px",
               textAlign: "center",
               cursor: "pointer",
-              border: `3px solid ${seat.color}`,
+              border: seat.hero
+                ? "3px solid #b8c0c8"
+                : `3px solid ${seat.color}`,
 boxShadow: selectedSeat === seat.id ? "0 0 0 3px #222, 0 0 0 5px white" : "none",
             }}
           >
@@ -2327,8 +2389,16 @@ boxShadow: selectedSeat === seat.id ? "0 0 0 3px #222, 0 0 0 5px white" : "none"
               padding: "22px",
             }}
           >
-            {isEditingNick ? (
-  <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "20px",
+              }}
+            >
+              {isEditingNick ? (
+  <div style={{ display: "flex", gap: "10px", marginBottom: "15px", flex: 1 }}>
     <input
       value={editedNick}
       onChange={(e) => setEditedNick(e.target.value)}
@@ -2356,8 +2426,21 @@ boxShadow: selectedSeat === seat.id ? "0 0 0 3px #222, 0 0 0 5px white" : "none"
     </button>
   </div>
 )}
-
-            <strong>Color:</strong>
+              <strong style={{ marginLeft: "auto", textAlign: "right" }}>
+                {colorNames[openedPlayer.color] || "Sin asignar"}
+              </strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+              <button
+                onClick={() => {
+                  setEditedColorNames({ ...colorNames });
+                  setIsEditingColorNames(true);
+                }}
+                style={{ padding: "4px 8px", marginTop: "10px", cursor: "pointer" }}
+              >
+                Editar colores
+              </button>
+            </div>
             <div style={{ display: "flex", gap: "10px", marginTop: "10px", marginBottom: "15px" }}>
               {tagColors.map((color) => (
                 <button
@@ -2471,7 +2554,74 @@ boxShadow: selectedSeat === seat.id ? "0 0 0 3px #222, 0 0 0 5px white" : "none"
         </div>
       )}
     </div>
-  )}
+      )}
+      {isEditingColorNames && (
+        <div
+          onClick={() => setIsEditingColorNames(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 7000,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(480px, calc(100% - 32px))",
+              maxHeight: "85vh",
+              overflowY: "auto",
+              background: "#1b1b1b",
+              border: "1px solid #555",
+              borderRadius: "12px",
+              padding: "20px",
+            }}
+          >
+            <h2 style={{ marginTop: 0, color: "white" }}>Editar colores</h2>
+            <div style={{ display: "grid", gap: "10px" }}>
+              {tagColors.map((color) => (
+                <label
+                  key={color}
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: "24px",
+                      height: "24px",
+                      flex: "0 0 24px",
+                      borderRadius: "50%",
+                      background: color,
+                      border: "1px solid #777",
+                    }}
+                  />
+                  <input
+                    aria-label={`Nombre para ${DEFAULT_COLOR_NAMES[color]}`}
+                    value={editedColorNames[color] || ""}
+                    onChange={(event) =>
+                      setEditedColorNames((currentNames) => ({
+                        ...currentNames,
+                        [color]: event.target.value,
+                      }))
+                    }
+                    maxLength={40}
+                    style={{ flex: 1, minWidth: 0, padding: "8px" }}
+                  />
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "18px" }}>
+              <button onClick={() => setIsEditingColorNames(false)}>
+                Cancelar
+              </button>
+              <button onClick={saveColorNames}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
   {confirmModal && (
   <div
     style={{

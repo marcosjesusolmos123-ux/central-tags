@@ -10,6 +10,7 @@ export default function DoubleTableView({
   onSeatLeave,
   onSelectSeat,
   onOpenPlayer,
+  colorNames,
 
   searchText,
   setSearchText,
@@ -175,9 +176,21 @@ export default function DoubleTableView({
       boxShadow: "0 0 25px rgba(0,0,0,0.8)",
     }}
   >
-    <h2 style={{ marginTop: 0, color: "white" }}>
-      {hoveredSeat.seat.nick}
-    </h2>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "10px",
+      }}
+    >
+      <h2 style={{ margin: 0, color: "white", textAlign: "left" }}>
+        {hoveredSeat.seat.nick}
+      </h2>
+      <div style={{ color: "#bbb", textAlign: "right" }}>
+        {colorNames[hoveredSeat.seat.color] || "Sin asignar"}
+      </div>
+    </div>
 
     {hoveredSeat.seat.notes.length > 0 ? (
       hoveredSeat.seat.notes.map((note, index) => (
@@ -231,7 +244,7 @@ onDoubleClick={() => {
 
                 color: "white",
                 border: seat.hero
-  ? "3px solid #1e90ff"
+  ? "3px solid #b8c0c8"
   : `3px solid ${seat.color || "#666"}`,
 
 boxShadow:

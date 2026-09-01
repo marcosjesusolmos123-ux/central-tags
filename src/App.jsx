@@ -97,6 +97,7 @@ function PlayerTooltip({ player, colorNames }) {
         padding: "18px",
         zIndex: 20,
         boxShadow: "0 0 25px rgba(0,0,0,0.8)",
+        pointerEvents: "none",
       }}
     >
       <div

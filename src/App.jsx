@@ -81,6 +81,53 @@ function ToastStack({ toasts, placement = "center" }) {
     </div>
   );
 }
+
+function PlayerTooltip({ player, colorNames }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "360px",
+        background: "#111",
+        border: `3px solid ${player.color}`,
+        borderRadius: "12px",
+        padding: "18px",
+        zIndex: 20,
+        boxShadow: "0 0 25px rgba(0,0,0,0.8)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "10px",
+        }}
+      >
+        <h2 style={{ margin: 0, color: "white", textAlign: "left" }}>
+          {player.nick}
+        </h2>
+        <div style={{ color: "#bbb", textAlign: "right" }}>
+          {colorNames[player.color] || "Sin asignar"}
+        </div>
+      </div>
+
+      {player.notes.length > 0 ? (
+        player.notes.map((note, index) => (
+          <div key={index} style={{ marginBottom: "10px", fontSize: "17px" }}>
+            {note}
+          </div>
+        ))
+      ) : (
+        <div style={{ fontSize: "14px", color: "#aaa" }}>Sin notas todavÃ­a.</div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const appContainerRef = useRef(null);
   const passwordInputRef = useRef(null);
@@ -123,6 +170,7 @@ const [confirmModal, setConfirmModal] = useState(null);
 const [databaseSearchText, setDatabaseSearchText] = useState("");
 const [selectedDatabasePlayer, setSelectedDatabasePlayer] = useState(null);
 const [importedPlayers, setImportedPlayers] = useState([]);
+const [listPlayers, setListPlayers] = useState([]);
 const [colorNames, setColorNames] = useState(DEFAULT_COLOR_NAMES);
 const [editedColorNames, setEditedColorNames] = useState(DEFAULT_COLOR_NAMES);
 const [isEditingColorNames, setIsEditingColorNames] = useState(false);
@@ -221,6 +269,7 @@ const [lobbyMode, setLobbyMode] = useState("single");
 
 const allPlayers = [
   ...seatedPlayers,
+  ...listPlayers,
   ...importedPlayers,
 ];
 
@@ -264,6 +313,7 @@ useEffect(() => {
   loadTablesFromCloud(verifiedUser);
 } else {
   setImportedPlayers([]);
+  setListPlayers([]);
   setColorNames(DEFAULT_COLOR_NAMES);
 }
   });
@@ -284,13 +334,14 @@ useEffect(() => {
     {
       email: user.email,
       tables: tables,
+      listPlayers: listPlayers,
       importedPlayers: importedPlayers,
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
   );
 }
-}, [tables, importedPlayers, user, loadedUserId]);
+}, [tables, listPlayers, importedPlayers, user, loadedUserId]);
 useEffect(() => {
   function handlePaste(event) {
   const tagName = event.target.tagName;
@@ -454,6 +505,7 @@ async function saveTablesToCloud() {
     {
       email: user.email,
       tables: tables,
+      listPlayers: listPlayers,
       importedPlayers: importedPlayers,
       updatedAt: new Date().toISOString(),
     },
@@ -480,6 +532,7 @@ async function loadTablesFromCloud(targetUser = user) {
     setHeroName(data.heroName || "HERO");
     setColorNames({ ...DEFAULT_COLOR_NAMES, ...(data.colorNames || {}) });
     setTables(data.tables || emptyTables);
+    setListPlayers(Array.isArray(data.listPlayers) ? data.listPlayers : []);
 
     setImportedPlayers(
       Array.isArray(data.importedPlayers) ? data.importedPlayers : []
@@ -490,6 +543,7 @@ async function loadTablesFromCloud(targetUser = user) {
     setHeroName("HERO");
     setColorNames(DEFAULT_COLOR_NAMES);
     setTables(emptyTables);
+    setListPlayers([]);
     setImportedPlayers([]);
   }
 
@@ -524,6 +578,9 @@ function confirmDeleteDatabasePlayer(player) {
       setImportedPlayers((currentPlayers) =>
         currentPlayers.filter((savedPlayer) => savedPlayer.nick !== player.nick)
       );
+      setListPlayers((currentPlayers) =>
+        currentPlayers.filter((savedPlayer) => savedPlayer.nick !== player.nick)
+      );
       setSelectedDatabasePlayer((selectedPlayer) =>
         selectedPlayer?.nick === player.nick ? null : selectedPlayer
       );
@@ -545,6 +602,43 @@ function confirmDeleteDatabasePlayer(player) {
     setOpenedPlayer(null);
   }
 function sitPlayerInSelectedSeat(nick) {
+  if (lobbyMode === "list") {
+    if (!selectedSeat) {
+      showToast("Primero seleccioná un asiento.");
+      return;
+    }
+
+    const cleanNick = nick.trim();
+
+    if (!cleanNick) {
+      showToast("⚠️ Escribí un nick.");
+      return;
+    }
+
+    const existingPlayer = allPlayers.find(
+      (player) => player.nick === cleanNick
+    );
+
+    setListPlayers((currentPlayers) => {
+      const playerAlreadyExists = currentPlayers.some(
+        (player) => player.nick === cleanNick
+      );
+
+      if (playerAlreadyExists) {
+        showToast("Este jugador ya está sentado en la mesa. El OCR ya fue procesado y consumió una captura.");
+        return currentPlayers;
+      }
+
+      return [
+        ...currentPlayers,
+        existingPlayer
+          ? { ...existingPlayer, notes: [...existingPlayer.notes] }
+          : { nick: cleanNick, color: "#666", notes: [] },
+      ];
+    });
+    return;
+  }
+
   if (!selectedSeat) {
     showToast("⚠️ Primero seleccioná un asiento.");
     return;
@@ -605,14 +699,14 @@ async function uploadImageToOCR(file) {
     return;
   }
 
-  if (selectedSeat === 5) {
+  if (lobbyMode !== "list" && selectedSeat === 5) {
     showToast("⚠️ No podés reemplazar tu asiento.");
     return;
   }
 
-  const selectedSeatData = currentSeats.find(
-    (seat) => seat.id === selectedSeat
-  );
+  const selectedSeatData = lobbyMode === "list"
+    ? null
+    : currentSeats.find((seat) => seat.id === selectedSeat);
 
   if (selectedSeatData && !isEmptySeatNick(selectedSeatData.nick)) {
     showToast(
@@ -678,7 +772,67 @@ setSearchText("");
   setDetectedNick("");
 }
 
+  function removePlayerFromList(selectedNick) {
+      const playerToArchive = listPlayers.find(
+        (player) => player.nick === selectedNick
+      );
+
+      if (!playerToArchive) return showToast("⚠️ El asiento ya está vacío.");
+
+      setImportedPlayers((currentPlayers) => {
+        const existingPlayer = currentPlayers.find(
+          (player) => player.nick === playerToArchive.nick
+        );
+
+        if (!existingPlayer) return [...currentPlayers, { ...playerToArchive }];
+
+        return currentPlayers.map((player) =>
+          player.nick === playerToArchive.nick
+            ? {
+                ...player,
+                color: playerToArchive.color,
+                notes: Array.from(new Set([...player.notes, ...playerToArchive.notes])),
+              }
+            : player
+        );
+      });
+
+      setListPlayers((currentPlayers) =>
+        currentPlayers.filter((player) => player.nick !== selectedNick)
+      );
+      setSelectedSeat(null);
+      setHoveredSeat(null);
+      setOpenedPlayer(null);
+      showToast("Jugador guardado en la base de datos.");
+  }
+
+  function clearList() {
+    setConfirmModal({
+      title: "Eliminar lista",
+      message: "¿Seguro que querés quitar todos los jugadores de la lista?\n\nEsto no borrará la base de datos.",
+      onConfirm: () => {
+        setListPlayers([]);
+        setSelectedSeat(null);
+        setHoveredSeat(null);
+        setOpenedPlayer(null);
+        setConfirmModal(null);
+        showToast("Lista eliminada.");
+      },
+    });
+  }
+
   function removePlayerFromSeat() {
+    if (lobbyMode === "list") {
+      const selectedNick = typeof selectedSeat === "string" && selectedSeat.startsWith("list:")
+        ? selectedSeat.slice(5)
+        : null;
+
+      if (!selectedNick) return showToast("⚠️ Primero seleccioná un asiento.");
+
+      removePlayerFromList(selectedNick);
+      return;
+    }
+
     if (!selectedSeat) return showToast("⚠️ Primero seleccioná un asiento.");
     if (selectedSeat === 5) return showToast("⚠️ No podés limpiar tu propio asiento.");
 
@@ -813,6 +967,12 @@ function changePlayerColor(color) {
     )
   );
 
+  setListPlayers((currentPlayers) =>
+    currentPlayers.map((player) =>
+      player.nick === targetNick ? { ...player, color } : player
+    )
+  );
+
   setOpenedPlayer((current) => ({ ...current, color }));
 }
 
@@ -866,6 +1026,12 @@ function saveEditedNick() {
     )
   );
 
+  setListPlayers((currentPlayers) =>
+    currentPlayers.map((player) =>
+      player.nick === oldNick ? { ...player, nick: newNick } : player
+    )
+  );
+
   setOpenedPlayer((current) => ({
     ...current,
     nick: newNick,
@@ -895,6 +1061,14 @@ function saveEditedNick() {
   });
 
   setImportedPlayers((currentPlayers) =>
+    currentPlayers.map((player) =>
+      player.nick === targetNick
+        ? { ...player, notes: [noteWithDate, ...player.notes] }
+        : player
+    )
+  );
+
+  setListPlayers((currentPlayers) =>
     currentPlayers.map((player) =>
       player.nick === targetNick
         ? { ...player, notes: [noteWithDate, ...player.notes] }
@@ -933,6 +1107,17 @@ function saveEditedNick() {
   });
 
   setImportedPlayers((currentPlayers) =>
+    currentPlayers.map((player) =>
+      player.nick === targetNick
+        ? {
+            ...player,
+            notes: updatedNotes,
+          }
+        : player
+    )
+  );
+
+  setListPlayers((currentPlayers) =>
     currentPlayers.map((player) =>
       player.nick === targetNick
         ? {
@@ -983,6 +1168,19 @@ function saveEditedNote() {
   });
 
   setImportedPlayers((currentPlayers) =>
+    currentPlayers.map((player) =>
+      player.nick === targetNick
+        ? {
+            ...player,
+            notes: player.notes.map((note, index) =>
+              index === editingNoteIndex ? newNote : note
+            ),
+          }
+        : player
+    )
+  );
+
+  setListPlayers((currentPlayers) =>
     currentPlayers.map((player) =>
       player.nick === targetNick
         ? {
@@ -1622,6 +1820,27 @@ boxSizing: "border-box",
   >
     Dos mesas
   </button>
+
+  <button
+    onClick={() => {
+      setLobbyMode("list");
+      setSelectedSeat(null);
+      setHoveredSeat(null);
+      setIsUserMenuOpen(false);
+    }}
+    style={{
+      width: "100%",
+      marginTop: "6px",
+      padding: "7px",
+      background: lobbyMode === "list" ? "#1e90ff" : "#333",
+      color: "white",
+      border: "1px solid #555",
+      borderRadius: "6px",
+      cursor: "pointer",
+    }}
+  >
+    Modo Lista
+  </button>
 </div>
     <button style={{ width: "100%", marginBottom: "6px" }}>
       Configuración
@@ -1975,6 +2194,7 @@ showToast("✅ Base importada correctamente");
     };
 
     setTables(emptyTables);
+    setListPlayers([]);
     setImportedPlayers([]);
     setSelectedDatabasePlayer(null);
     setDatabaseSearchText("");
@@ -2144,6 +2364,153 @@ return;
     </div>
   </div>
 )}
+      {lobbyMode === "list" ? (
+        <div
+          onClick={() => {
+            setSelectedSeat("list");
+          }}
+          style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: "900px",
+            minHeight: "600px",
+            margin: "0 auto",
+            padding: "24px",
+            background: "#1b1b1b",
+            border: selectedSeat ? "2px solid #77bdff" : "1px solid #444",
+            borderRadius: "12px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{ textAlign: "center", marginBottom: "15px" }}
+          >
+            <input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addSearchPlayerToSeat();
+              }}
+              placeholder="Buscar jugador..."
+              style={{ padding: "10px", width: "300px", borderRadius: "8px", border: "1px solid #444" }}
+            />
+            <button
+              onClick={addSearchPlayerToSeat}
+              style={{ padding: "10px 15px", borderRadius: "8px", cursor: "pointer", marginLeft: "10px" }}
+            >
+              Agregar
+            </button>
+            {searchResults.length > 0 && (
+              <div style={{ width: "300px", margin: "10px auto", background: "#1b1b1b", border: "1px solid #555", borderRadius: "8px", padding: "5px" }}>
+                {searchResults.map((player) => (
+                  <div
+                    key={player.nick}
+                    onClick={() => {
+                      sitPlayerInSelectedSeat(player.nick);
+                      setSearchText("");
+                    }}
+                    style={{ padding: "8px", cursor: "pointer", borderBottom: "1px solid #333" }}
+                  >
+                    {player.nick}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: "center", marginBottom: "20px" }}>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                removePlayerFromSeat();
+              }}
+              style={{ padding: "10px 15px", borderRadius: "8px", cursor: "pointer" }}
+            >
+              Quitar del asiento
+            </button>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                clearList();
+              }}
+              style={{
+                padding: "10px 15px",
+                marginLeft: "10px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                background: "#5c1a1a",
+                color: "white",
+                border: "1px solid #833",
+              }}
+            >
+              Eliminar lista
+            </button>
+          </div>
+
+          {hoveredSeat && !hoveredSeat.hero && !isEmptySeatNick(hoveredSeat.nick) && !openedPlayer && (
+            <PlayerTooltip player={hoveredSeat} colorNames={colorNames} />
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+            {listPlayers.map((player) => (
+              <div
+                className="seat-card"
+                key={player.nick}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedSeat(`list:${player.nick}`);
+                }}
+                onDoubleClick={() => openPlayerCard(player)}
+                onMouseEnter={() => setHoveredSeat(player)}
+                onMouseLeave={() => setHoveredSeat(null)}
+                style={{
+                  position: "relative",
+                  background: "#222",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  width: "165px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: `3px solid ${player.color}`,
+                  boxShadow: selectedSeat === `list:${player.nick}` ? "0 0 0 3px #222, 0 0 0 5px white" : "none",
+                }}
+                title={player.nick}
+              >
+                <button
+                  type="button"
+                  aria-label={`Quitar a ${player.nick} de la lista`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removePlayerFromList(player.nick);
+                  }}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  style={{
+                    position: "absolute",
+                    top: "4px",
+                    right: "5px",
+                    width: "20px",
+                    height: "20px",
+                    padding: 0,
+                    borderRadius: "50%",
+                    border: "1px solid #777",
+                    background: "#5c1a1a",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    lineHeight: "16px",
+                  }}
+                >
+                  ×
+                </button>
+                <div style={{ fontWeight: 400, fontSize: "18px", lineHeight: "1.25", fontFamily: '"Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif', overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {player.nick}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
       <div style={{ textAlign: "center", marginBottom: "15px" }}>
   <input
     value={searchText}
@@ -2365,6 +2732,8 @@ boxShadow: selectedSeat === seat.id ? "0 0 0 3px #222, 0 0 0 5px white" : "none"
           </div>
         ))}
       </div>
+      </>
+      )}
 
       {openedPlayer && (
         <div

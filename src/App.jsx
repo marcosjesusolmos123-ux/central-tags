@@ -812,6 +812,31 @@ setSearchText("");
       title: "Eliminar lista",
       message: "¿Seguro que querés quitar todos los jugadores de la lista?\n\nEsto no borrará la base de datos.",
       onConfirm: () => {
+        setImportedPlayers((currentPlayers) => {
+          const mergedPlayers = [...currentPlayers];
+
+          listPlayers.forEach((playerToArchive) => {
+            const existingPlayer = mergedPlayers.find(
+              (player) => player.nick === playerToArchive.nick
+            );
+
+            if (!existingPlayer) {
+              mergedPlayers.push({ ...playerToArchive });
+              return;
+            }
+
+            const existingPlayerIndex = mergedPlayers.indexOf(existingPlayer);
+            mergedPlayers[existingPlayerIndex] = {
+              ...existingPlayer,
+              color: playerToArchive.color,
+              notes: Array.from(
+                new Set([...existingPlayer.notes, ...playerToArchive.notes])
+              ),
+            };
+          });
+
+          return mergedPlayers;
+        });
         setListPlayers([]);
         setSelectedSeat(null);
         setHoveredSeat(null);
